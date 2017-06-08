@@ -17,6 +17,16 @@ namespace pbf {
         GLuint shader_program_{ 0 };
     };
 
+    // RAII
+    class WithShaderProgram {
+    public:
+        WithShaderProgram(const ShaderProgram& p);
+        ~WithShaderProgram();
+
+    private:
+        const ShaderProgram& p_;
+    };
+
 } // namespace pbf
 
 #endif // shader_program_h

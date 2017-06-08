@@ -154,6 +154,7 @@ int main() {
 	glViewport(0, 0, width, height);
 
 	render.InitShaders("Shaders/vertex.vert", "Shaders/fragment.frag");
+	render.InitSpriteShaders("Shaders/sprite_vertex.vert", "Shaders/sprite_fragment.frag");
 	render.InitScene();
 
 	// Game loop

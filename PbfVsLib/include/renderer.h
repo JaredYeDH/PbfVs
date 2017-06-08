@@ -29,6 +29,7 @@ namespace pbf {
         // TOOD: we might need to have multiple shader programs in the future, so 
         // this function signature should be deprecated
         void InitShaders(const char* vert_path, const char* frag_path);
+        void InitSpriteShaders(const char* vert_path, const char* frag_path);
         
         void InitScene();
         
@@ -48,9 +49,10 @@ namespace pbf {
         // OpenGL transformation matrices
         glm::mat4 model_;
         glm::mat4 proj_;
-        
-        // GLuint shader_program_;
+
+        // default shaders
         ShaderProgram shader_program_;
+        ShaderProgram sprite_shader_program_;
 
         // *world* is a cube that defines the boundary of the PBF.
         GLfloat world_sz_x_;

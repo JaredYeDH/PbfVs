@@ -59,8 +59,11 @@ namespace {
     }
 
     void SceneRenderer::InitShaders(const char* vert_path, const char* frag_path) {
-        // using namespace pbf;
         shader_program_.Init(vert_path, frag_path);
+    }
+
+    void SceneRenderer::InitSpriteShaders(const char* vert_path, const char* frag_path) {
+        sprite_shader_program_.Init(vert_path, frag_path);
     }
     
     void SceneRenderer::SetVao_(GLuint vao, GLuint vbo, GLuint ebo) const {
@@ -79,6 +82,23 @@ namespace {
         glBindVertexArray(0);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
+    }
+
+    void SetSpriteVao(GLuint vao, GLuint vbo) {
+        glBindVertexArray(vao);
+        
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        
+        GLsizei stride = sizeof(GLfloat) * 6;
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (GLvoid*)0);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (GLvoid*)(sizeof(GLfloat) * 3));
+        glEnableVertexAttribArray(1);
+        
+        // Unbind VAO first, then VBO and EBO!
+        glBindVertexArray(0);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+
     }
     
     void SceneRenderer::InitScene() {
@@ -151,13 +171,13 @@ namespace {
         
         glGenVertexArrays(1, &particles_vao_);
         glGenBuffers(1, &particles_vbo_);
-        glGenBuffers(1, &particles_ebo_);
+        // glGenBuffers(1, &particles_ebo_);
         
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, particles_ebo_);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint) * particle_indices_.size(),
-                     particle_indices_.data(), GL_STATIC_DRAW);
+        // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, particles_ebo_);
+        // glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint) * particle_indices_.size(),
+        //              particle_indices_.data(), GL_STATIC_DRAW);
         
-        SetVao_(particles_vao_, particles_vbo_, particles_ebo_);
+        SetSpriteVao(particles_vao_, particles_vbo_);
         
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     }
@@ -244,55 +264,72 @@ namespace {
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         
-        shader_program_.Use();
-        
-        GLuint model_loc = glGetUniformLocation(shader_program_.Get(), "model");
-        glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model_));
-        
-        glm::mat4 view = camera_->GetViewMatrix();
-        GLuint view_loc = glGetUniformLocation(shader_program_.Get(), "view");
-        glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
-        
-        GLuint proj_loc = glGetUniformLocation(shader_program_.Get(), "proj");
-        glUniformMatrix4fv(proj_loc, 1, GL_FALSE, glm::value_ptr(proj_));
-        
-        // draw the boundaries
-        for (size_t i = 0; i < boundary_records_.size(); ++i) {
-            UpdateBoundaryAt_(i);
+        {
+            WithShaderProgram w{ shader_program_ };
+            GLuint model_loc = glGetUniformLocation(shader_program_.Get(), "model");
+            glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model_));
+            
+            glm::mat4 view = camera_->GetViewMatrix();
+            GLuint view_loc = glGetUniformLocation(shader_program_.Get(), "view");
+            glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
+            
+            GLuint proj_loc = glGetUniformLocation(shader_program_.Get(), "proj");
+            glUniformMatrix4fv(proj_loc, 1, GL_FALSE, glm::value_ptr(proj_));
+            
+            // draw the boundaries
+            for (size_t i = 0; i < boundary_records_.size(); ++i) {
+                UpdateBoundaryAt_(i);
+            }
+            glBindBuffer(GL_ARRAY_BUFFER, boundaries_vbo_);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * boundary_vertices_.size(),
+                         boundary_vertices_.data(), GL_STREAM_DRAW);
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+            
+            glBindVertexArray(boundaries_vao_);
+            glDrawElements(GL_TRIANGLES, (int)boundary_indices_.size(), GL_UNSIGNED_INT, 0);
+            glBindVertexArray(0);
+
+            // draw the xyz frame
+            glBindVertexArray(frame_vao_);
+            glDrawElements(GL_LINES, (int)frame_indices_.size(), GL_UNSIGNED_INT, 0);
+            glBindVertexArray(0);
         }
-        glBindBuffer(GL_ARRAY_BUFFER, boundaries_vbo_);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * boundary_vertices_.size(),
-                     boundary_vertices_.data(), GL_STREAM_DRAW);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        
-        glBindVertexArray(boundaries_vao_);
-        glDrawElements(GL_TRIANGLES, (int)boundary_indices_.size(), GL_UNSIGNED_INT, 0);
-        glBindVertexArray(0);
 
-		// draw the xyz frame
-		glBindVertexArray(frame_vao_);
-		glDrawElements(GL_LINES, (int)frame_indices_.size(), GL_UNSIGNED_INT, 0);
-		glBindVertexArray(0);
+        {
+            WithShaderProgram w{ sprite_shader_program_ };
+            GLuint model_loc = glGetUniformLocation(sprite_shader_program_.Get(), "model");
+            glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model_));
+            
+            glm::mat4 view = camera_->GetViewMatrix();
+            GLuint view_loc = glGetUniformLocation(sprite_shader_program_.Get(), "view");
+            glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
+            
+            GLuint proj_loc = glGetUniformLocation(sprite_shader_program_.Get(), "proj");
+            glUniformMatrix4fv(proj_loc, 1, GL_FALSE, glm::value_ptr(proj_));
+            // draw the particles
+            // https://www.gamedev.net/topic/597387-vao-is-it-necessary-to-redo-setup-each-time-buffer-data-changes/ 
+            for (size_t p_i = 0; p_i < ps_->NumParticles(); ++p_i) {
+                const auto pos = ps_->Get(p_i).position();
+                float col_in = Interpolate(pos.y + world_sz_y_ * 0.5f, 0.0f, world_sz_y_, 0.0f, 1.0f);
+                col_in = std::max(std::min(col_in, 1.0f), 0.0f);
+                const glm::vec3 color{ 1.0f, col_in, 1.0f - col_in };
+                ChangePointToDraw(pos, p_i, &particle_vertices_, color);
+            }
 
-		// draw the particles
-        // https://www.gamedev.net/topic/597387-vao-is-it-necessary-to-redo-setup-each-time-buffer-data-changes/ 
-        for (size_t p_i = 0; p_i < ps_->NumParticles(); ++p_i) {
-			const auto pos = ps_->Get(p_i).position();
-			float col_in = Interpolate(pos.y + world_sz_y_ * 0.5f, 0.0f, world_sz_y_, 0.0f, 1.0f);
-			col_in = std::max(std::min(col_in, 1.0f), 0.0f);
-			const glm::vec3 color{ 1.0f, col_in, 1.0f - col_in };
-			ChangePointToDraw(pos, p_i, &particle_vertices_, color);
+            glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
+            glEnable(GL_POINT_SPRITE);
+
+            glBindBuffer(GL_ARRAY_BUFFER, particles_vbo_);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * particle_vertices_.size(),
+                         particle_vertices_.data(), GL_STREAM_DRAW);
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+            
+            glBindVertexArray(particles_vao_);
+            glDrawArrays(GL_POINTS, 0, (int)ps_->NumParticles());
+            glBindVertexArray(0);
+            
+            glDisable(GL_VERTEX_PROGRAM_POINT_SIZE);
+            glDisable(GL_POINT_SPRITE);
         }
-        
-        glBindBuffer(GL_ARRAY_BUFFER, particles_vbo_);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * particle_vertices_.size(),
-                     particle_vertices_.data(), GL_STREAM_DRAW);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        
-        glBindVertexArray(particles_vao_);
-        glDrawElements(GL_TRIANGLES, (int)particle_indices_.size(), GL_UNSIGNED_INT, 0);
-        glBindVertexArray(0);
-
-        shader_program_.Unbind();
     }
 } // namespace pbf

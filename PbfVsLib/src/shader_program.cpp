@@ -12,6 +12,8 @@ namespace pbf {
         glAttachShader(shader_program_, vert_shader.Get());
         glAttachShader(shader_program_, frag_shader.Get());
         glLinkProgram(shader_program_);
+
+        CHECK_PROGRAM_LINK_STATUS(shader_program_);
     }
 
     void ShaderProgram::Use() const {
@@ -22,4 +24,6 @@ namespace pbf {
         glUseProgram(0);
     }
 
+    WithShaderProgram::WithShaderProgram(const ShaderProgram& p) : p_(p) { p_.Use(); }
+    WithShaderProgram::~WithShaderProgram() { p_.Unbind(); }
 } // namespace pbf
