@@ -3,6 +3,8 @@ layout (location = 0) in vec3 position;
 layout (location = 1) in vec3 color;
 
 out vec3 vertex_color;
+out vec3 vsPos3;
+out float radius;
 
 uniform mat4 model;
 uniform mat4 view;
@@ -15,9 +17,9 @@ void main()
     // clip space (NDC) position, all coordinate components are in [-1.0, 1.0]
     gl_Position = proj * vsPosition;
 
-    vec3 vsPosition3 = vsPosition.xyz / vsPosition.w;
-    float vsPositionLen = length(vsPosition3);
-    float radius = max(3.0, 600.0 / vsPositionLen);
+    vsPos3 = vsPosition.xyz / vsPosition.w;
+    float vsPositionLen = length(vsPos3);
+    radius = max(3.0, 500.0 / vsPositionLen);
     // Need to glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
     gl_PointSize = radius;
       

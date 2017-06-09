@@ -262,8 +262,9 @@ namespace {
         // Render
         // Clear the colorbuffer
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
-        
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glEnable(GL_DEPTH_TEST);
         {
             WithShaderProgram w{ shader_program_ };
             GLuint model_loc = glGetUniformLocation(shader_program_.Get(), "model");
@@ -277,17 +278,17 @@ namespace {
             glUniformMatrix4fv(proj_loc, 1, GL_FALSE, glm::value_ptr(proj_));
             
             // draw the boundaries
-            for (size_t i = 0; i < boundary_records_.size(); ++i) {
-                UpdateBoundaryAt_(i);
-            }
-            glBindBuffer(GL_ARRAY_BUFFER, boundaries_vbo_);
-            glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * boundary_vertices_.size(),
-                         boundary_vertices_.data(), GL_STREAM_DRAW);
-            glBindBuffer(GL_ARRAY_BUFFER, 0);
+            // for (size_t i = 0; i < boundary_records_.size(); ++i) {
+            //     UpdateBoundaryAt_(i);
+            // }
+            // glBindBuffer(GL_ARRAY_BUFFER, boundaries_vbo_);
+            // glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * boundary_vertices_.size(),
+            //              boundary_vertices_.data(), GL_STREAM_DRAW);
+            // glBindBuffer(GL_ARRAY_BUFFER, 0);
             
-            glBindVertexArray(boundaries_vao_);
-            glDrawElements(GL_TRIANGLES, (int)boundary_indices_.size(), GL_UNSIGNED_INT, 0);
-            glBindVertexArray(0);
+            // glBindVertexArray(boundaries_vao_);
+            // glDrawElements(GL_TRIANGLES, (int)boundary_indices_.size(), GL_UNSIGNED_INT, 0);
+            // glBindVertexArray(0);
 
             // draw the xyz frame
             glBindVertexArray(frame_vao_);

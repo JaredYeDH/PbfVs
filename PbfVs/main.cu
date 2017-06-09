@@ -34,7 +34,7 @@
 ////////////////////////////////////////////////////
 
 // Window dimensions
-const GLuint WIDTH = 800, HEIGHT = 600;
+const GLuint WIDTH = 1024, HEIGHT = 768;
 
 float delta_time = 0.0f;
 glm::vec3 world_size_dim{ 0.0f };
