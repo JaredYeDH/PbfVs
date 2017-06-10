@@ -24,6 +24,10 @@ namespace pbf {
         glUseProgram(0);
     }
 
+    GLuint ShaderProgram::GetUniformLoc(const char* name) const {
+        return glGetUniformLocation(Get(), name);
+    }
+    
     WithShaderProgram::WithShaderProgram(const ShaderProgram& p) : p_(p) { p_.Use(); }
     WithShaderProgram::~WithShaderProgram() { p_.Unbind(); }
 } // namespace pbf

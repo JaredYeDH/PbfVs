@@ -81,6 +81,10 @@ namespace pbf {
         std::vector<GLfloat> particle_vertices_;
         std::vector<GLuint> particle_indices_;
 
+        // fluid rendering
+        GLuint fluid_fbo_;
+        GLuint fluid_texture_;
+        GLuint fluid_rbo_;
     public:
         // public for quick implementation
         struct BoundaryRecord {

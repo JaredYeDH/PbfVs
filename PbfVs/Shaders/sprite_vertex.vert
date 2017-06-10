@@ -19,7 +19,7 @@ void main()
 
     vsPos3 = vsPosition.xyz / vsPosition.w;
     float vsPositionLen = length(vsPos3);
-    radius = max(3.0, 500.0 / vsPositionLen);
+    radius = max(3.0, 600.0 / vsPositionLen);
     // Need to glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
     gl_PointSize = radius;
       

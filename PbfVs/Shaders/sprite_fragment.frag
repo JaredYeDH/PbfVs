@@ -12,19 +12,10 @@ const float shininess = 40.0;
 
 float projectZ(float z, float near, float far) {
   // convert true depth z to depth-buffer depth 
-
-  /* assuming this is the projection matrix:
-     m = [w, 0, 0, 0;
-     0, h, 0, 0;
-     0, 0, f/(n-f), n*f/(n-f);
-     0, 0, -1, 0]
-  */
-
   return far*(z+near)/(z*(far-near));
 }
 
-void main()
-{
+void main() {
     // compute normal
     vec3 normal;
     normal.xy = gl_PointCoord * 2 - 1.0;
@@ -49,5 +40,6 @@ void main()
     float specAngle = max(dot(halfDir, normal), 0.0);
     float specular = pow(specAngle, shininess);
 
+    // color = vec4(normal, 1.0f);
     color = vec4(vertex_color * diffuse /* + specularColor * specular */, 1.0f);
 }

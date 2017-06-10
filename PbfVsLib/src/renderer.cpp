@@ -178,7 +178,36 @@ namespace {
         //              particle_indices_.data(), GL_STATIC_DRAW);
         
         SetSpriteVao(particles_vao_, particles_vbo_);
-        
+
+        // fluid rendering framebuffer
+        glGenFramebuffers(1, &fluid_fbo_);
+        glBindFramebuffer(GL_FRAMEBUFFER, fluid_fbo_);
+
+        glGenTextures(1, &fluid_texture_);
+        glBindTexture(GL_TEXTURE_2D, fluid_texture_);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1024, 768, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fluid_texture_, 0);
+
+        glGenRenderbuffers(1, &fluid_rbo_);
+        glBindBuffer(GL_RENDERBUFFER, fluid_rbo_);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, 1024, 768);
+        glBindBuffer(GL_RENDERBUFFER, 0);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, fluid_rbo_);
+
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+            std::cerr << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
+        }
+        else {
+            std::cout << "Framebuffer setup is complete" << std::endl;
+        }
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        // Done
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     }
     
@@ -186,6 +215,91 @@ namespace {
         const int num_boundaries = boundary_records_.size();
         boundary_vertices_.resize(4 * 6 * num_boundaries, 0.0f);
         boundary_indices_.resize(6 * num_boundaries, 0);
+    }
+    
+    void SceneRenderer::Render() {
+        // Render
+        // Clear the colorbuffer
+        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glEnable(GL_DEPTH_TEST);
+        {
+            WithShaderProgram w{ shader_program_ };
+            GLuint model_loc = shader_program_.GetUniformLoc("model");
+            glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model_));
+            
+            glm::mat4 view = camera_->GetViewMatrix();
+            GLuint view_loc = shader_program_.GetUniformLoc("view");
+            glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
+            
+            GLuint proj_loc = shader_program_.GetUniformLoc("proj");
+            glUniformMatrix4fv(proj_loc, 1, GL_FALSE, glm::value_ptr(proj_));
+            
+            // draw the boundaries
+            // for (size_t i = 0; i < boundary_records_.size(); ++i) {
+            //     UpdateBoundaryAt_(i);
+            // }
+            // glBindBuffer(GL_ARRAY_BUFFER, boundaries_vbo_);
+            // glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * boundary_vertices_.size(),
+            //              boundary_vertices_.data(), GL_STREAM_DRAW);
+            // glBindBuffer(GL_ARRAY_BUFFER, 0);
+            
+            // glBindVertexArray(boundaries_vao_);
+            // glDrawElements(GL_TRIANGLES, (int)boundary_indices_.size(), GL_UNSIGNED_INT, 0);
+            // glBindVertexArray(0);
+
+            // draw the xyz frame
+            glBindVertexArray(frame_vao_);
+            glDrawElements(GL_LINES, (int)frame_indices_.size(), GL_UNSIGNED_INT, 0);
+            glBindVertexArray(0);
+        }
+
+        {
+            WithShaderProgram w{ sprite_shader_program_ };
+            GLuint model_loc = shader_program_.GetUniformLoc("model");
+            glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model_));
+            
+            glm::mat4 view = camera_->GetViewMatrix();
+            GLuint view_loc = shader_program_.GetUniformLoc("view");
+            glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
+            
+            GLuint proj_loc = shader_program_.GetUniformLoc("proj");
+            glUniformMatrix4fv(proj_loc, 1, GL_FALSE, glm::value_ptr(proj_));
+            // draw the particles
+            // https://www.gamedev.net/topic/597387-vao-is-it-necessary-to-redo-setup-each-time-buffer-data-changes/ 
+            for (size_t p_i = 0; p_i < ps_->NumParticles(); ++p_i) {
+                const auto pos = ps_->Get(p_i).position();
+                float col_in = Interpolate(pos.y + world_sz_y_ * 0.5f, 0.0f, world_sz_y_, 0.0f, 1.0f);
+                col_in = std::max(std::min(col_in, 1.0f), 0.0f);
+                const glm::vec3 color{ 1.0f, col_in, 1.0f - col_in };
+                ChangePointToDraw(pos, p_i, &particle_vertices_, color);
+            }
+
+            glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
+            glEnable(GL_POINT_SPRITE);
+
+            glBindBuffer(GL_ARRAY_BUFFER, particles_vbo_);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * particle_vertices_.size(),
+                         particle_vertices_.data(), GL_STREAM_DRAW);
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+            
+            glBindVertexArray(particles_vao_);
+            glDrawArrays(GL_POINTS, 0, (int)ps_->NumParticles());
+            glBindVertexArray(0);
+            
+            glDisable(GL_VERTEX_PROGRAM_POINT_SIZE);
+            glDisable(GL_POINT_SPRITE);
+        }
+
+        // - Create a framebuffer
+        // - Create a 2D texture (color) and a renderbuffer object for depth buffer
+        // - Attach the texture/ renderbuffer to the framebuffer
+        // - Bind the framebuffer
+        // - Use the sprite vertex/fragment shaders to do the rendering
+        // - Output color to the texture and depth to depth buffer
+        // - Bind renderbuffer to CUDA surface object(ref?)
+        // - Launch kernel multiple times to compute normal and depth z.
     }
 
     void SceneRenderer::UpdateBoundaryAt_(size_t i) {
@@ -256,81 +370,5 @@ namespace {
         boundary_vertices_[vertex_begin + 21] = 1.0f;
         boundary_vertices_[vertex_begin + 22] = 0.5f;
         boundary_vertices_[vertex_begin + 23] = 0.2f;
-    }
-    
-    void SceneRenderer::Render() {
-        // Render
-        // Clear the colorbuffer
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        glEnable(GL_DEPTH_TEST);
-        {
-            WithShaderProgram w{ shader_program_ };
-            GLuint model_loc = glGetUniformLocation(shader_program_.Get(), "model");
-            glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model_));
-            
-            glm::mat4 view = camera_->GetViewMatrix();
-            GLuint view_loc = glGetUniformLocation(shader_program_.Get(), "view");
-            glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
-            
-            GLuint proj_loc = glGetUniformLocation(shader_program_.Get(), "proj");
-            glUniformMatrix4fv(proj_loc, 1, GL_FALSE, glm::value_ptr(proj_));
-            
-            // draw the boundaries
-            // for (size_t i = 0; i < boundary_records_.size(); ++i) {
-            //     UpdateBoundaryAt_(i);
-            // }
-            // glBindBuffer(GL_ARRAY_BUFFER, boundaries_vbo_);
-            // glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * boundary_vertices_.size(),
-            //              boundary_vertices_.data(), GL_STREAM_DRAW);
-            // glBindBuffer(GL_ARRAY_BUFFER, 0);
-            
-            // glBindVertexArray(boundaries_vao_);
-            // glDrawElements(GL_TRIANGLES, (int)boundary_indices_.size(), GL_UNSIGNED_INT, 0);
-            // glBindVertexArray(0);
-
-            // draw the xyz frame
-            glBindVertexArray(frame_vao_);
-            glDrawElements(GL_LINES, (int)frame_indices_.size(), GL_UNSIGNED_INT, 0);
-            glBindVertexArray(0);
-        }
-
-        {
-            WithShaderProgram w{ sprite_shader_program_ };
-            GLuint model_loc = glGetUniformLocation(sprite_shader_program_.Get(), "model");
-            glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model_));
-            
-            glm::mat4 view = camera_->GetViewMatrix();
-            GLuint view_loc = glGetUniformLocation(sprite_shader_program_.Get(), "view");
-            glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm::value_ptr(view));
-            
-            GLuint proj_loc = glGetUniformLocation(sprite_shader_program_.Get(), "proj");
-            glUniformMatrix4fv(proj_loc, 1, GL_FALSE, glm::value_ptr(proj_));
-            // draw the particles
-            // https://www.gamedev.net/topic/597387-vao-is-it-necessary-to-redo-setup-each-time-buffer-data-changes/ 
-            for (size_t p_i = 0; p_i < ps_->NumParticles(); ++p_i) {
-                const auto pos = ps_->Get(p_i).position();
-                float col_in = Interpolate(pos.y + world_sz_y_ * 0.5f, 0.0f, world_sz_y_, 0.0f, 1.0f);
-                col_in = std::max(std::min(col_in, 1.0f), 0.0f);
-                const glm::vec3 color{ 1.0f, col_in, 1.0f - col_in };
-                ChangePointToDraw(pos, p_i, &particle_vertices_, color);
-            }
-
-            glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
-            glEnable(GL_POINT_SPRITE);
-
-            glBindBuffer(GL_ARRAY_BUFFER, particles_vbo_);
-            glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * particle_vertices_.size(),
-                         particle_vertices_.data(), GL_STREAM_DRAW);
-            glBindBuffer(GL_ARRAY_BUFFER, 0);
-            
-            glBindVertexArray(particles_vao_);
-            glDrawArrays(GL_POINTS, 0, (int)ps_->NumParticles());
-            glBindVertexArray(0);
-            
-            glDisable(GL_VERTEX_PROGRAM_POINT_SIZE);
-            glDisable(GL_POINT_SPRITE);
-        }
     }
 } // namespace pbf

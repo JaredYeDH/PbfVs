@@ -8,11 +8,17 @@ namespace pbf {
     class ShaderProgram {
     public:
         ShaderProgram() = default;
+        
         void Init(const char* vert_filepath, const char* frag_filepath);
+        
         inline GLuint Get() const { return shader_program_; }
+        
         void Use() const;
+        
         void Unbind() const;
 
+        GLuint GetUniformLoc(const char* name) const;
+    
     private:
         GLuint shader_program_{ 0 };
     };
